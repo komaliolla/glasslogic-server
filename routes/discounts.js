@@ -132,8 +132,10 @@ router.post('/', async (req, res) => {
 
     for (let i = 0; i < details.length; i++) {
       const d = details[i];
-      // Use nags_prefix if provided; fall back to part_type + index to stay unique
-      const nagsPrefix   = (d.nags_prefix || '').trim() || `${d.part_type || 'ROW'}${i}`;
+      // nags_prefix is CHAR(2) in gl2015m1 — fall back to part_type + index to
+      // stay unique, but truncate so a bad/missing prefix never overflows the
+      // column and fails the whole transaction under STRICT_TRANS_TABLES.
+      const nagsPrefix   = ((d.nags_prefix || '').trim() || `${d.part_type || 'ROW'}${i}`).slice(0, 2);
       const discountAmt  = d.discount_amount  || 0;
       const laborRt      = d.labor_rate       || 0;
       const minHrs       = d.min_hours        || 0;
@@ -169,6 +171,19 @@ router.post('/', async (req, res) => {
     res.status(500).json({ error: err.message });
   } finally {
     conn.release();
+  }
+});
+
+// GET /api/discounts/parts  — NAGS prefix → part type lookup (gl2015m1.parts)
+router.get('/parts', async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      'SELECT nags_prefix, part_type FROM parts ORDER BY part_type, nags_prefix'
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('[discounts/parts GET]', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -235,7 +250,7 @@ router.put('/:code', async (req, res) => {
 
     for (let i = 0; i < details.length; i++) {
       const d = details[i];
-      const nagsPrefix  = (d.nags_prefix || '').trim() || `${d.part_type || 'ROW'}${i}`;
+      const nagsPrefix  = ((d.nags_prefix || '').trim() || `${d.part_type || 'ROW'}${i}`).slice(0, 2);
       const discountAmt = d.discount_amount || 0;
       const laborRt     = d.labor_rate      || 0;
       const minHrs      = d.min_hours       || 0;

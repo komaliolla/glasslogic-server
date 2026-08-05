@@ -485,10 +485,16 @@ router.get('/hardware-for-glass', async (req, res) => {
          COALESCE(ht.dsc, '')        AS type,
          nmx.mf_id,
          vgr.region_cd,
-         nhcd.nags_hw_id
+         nhcd.nags_hw_id,
+         COALESCE(
+           (SELECT p.prc FROM nags_hw_prc p
+            WHERE p.nags_hw_id = nh.nags_hw_id AND p.prc > 0
+            ORDER BY p.eff_dt DESC LIMIT 1),
+           0
+         ) AS list_price
        FROM veh_glass_region vgr
        JOIN nags_hw_cfg_det nhcd
-         ON  nhcd.nags_hw_cfg_id = vgr.nags_hw_cfg_id
+         ON  nhcd.nags_hw_cfg_id = vgr.note_id
        JOIN nags_mf_hw_xref nmx
          ON  nmx.nags_hw_id = nhcd.nags_hw_id
        JOIN mf_hw mh
@@ -511,9 +517,10 @@ router.get('/hardware-for-glass', async (req, res) => {
     );
 
     res.json(rows.map(r => ({
-      part_no: r.part_no,
-      color:   r.color,
-      type:    r.type,
+      part_no:    r.part_no,
+      color:      r.color,
+      type:       r.type,
+      list_price: parseFloat(r.list_price) || 0,
     })));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
