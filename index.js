@@ -8,6 +8,7 @@ const discountsRouter     = require('./routes/discounts');
 const nagsGlassRouter     = require('./routes/nagsGlass');
 const glassPartsRouter    = require('./routes/glassParts');
 const scheduleRouter      = require('./routes/schedule');
+const invoicesRouter      = require('./routes/invoices');
 
 const app  = express();
 const PORT = process.env.PORT || 4000;
@@ -23,6 +24,7 @@ app.use('/api/discounts',      discountsRouter);
 app.use('/api',                nagsGlassRouter);    // NAGS: makes, models, glass, hardware
 app.use('/api',                glassPartsRouter);   // legacy fallback
 app.use('/api/schedule',       scheduleRouter);
+app.use('/api/invoices',       invoicesRouter);
 
 // ── Health check ────────────────────────────────────────────
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
