@@ -23,12 +23,13 @@ node scripts/import_nags.js   # loads DATA/*.txt into MySQL (~2M rows, 5-15 min)
 
 This is the API server for GlassLogic, an auto-glass shop management app. It is CommonJS Express (`require`, not ESM) and is a separate repo from the frontend (`../frontend` locally, `glasslogic-frontend` remote) — the two only communicate over HTTP, CORS-gated by `CLIENT_URL`.
 
-**Three separate MySQL databases, one per domain**, each with its own connection pool in `config/`:
+**Four separate MySQL databases, one per domain**, each with its own connection pool in `config/`:
 - `config/db.js` — default DB (`DB_NAME` env var, e.g. `glasslogic`): customers, business types
 - `config/gl2015Db.js` — hardcoded to `gl2015m1`: discount schedules (legacy app's database)
 - `config/nagsDb.js` — hardcoded to `vehicle_db`: NAGS vehicle/make/model/glass/hardware reference data
+- `config/userDb.js` — hardcoded to `user`: employees (`id`, `name`, `total_working_hours`)
 
-Routes import whichever pool matches their domain (e.g. `routes/discounts.js` uses `gl2015Db`, `routes/nagsGlass.js` uses `nagsDb`, `routes/customers.js` and `routes/businessTypes.js` use the default `db`). When adding a route, pick the pool by which database actually owns the table, not by convenience.
+Routes import whichever pool matches their domain (e.g. `routes/discounts.js` uses `gl2015Db`, `routes/nagsGlass.js` uses `nagsDb`, `routes/customers.js` and `routes/businessTypes.js` use the default `db`, `routes/employees.js` uses `userDb`). When adding a route, pick the pool by which database actually owns the table, not by convenience.
 
 **Route pattern**: each file in `routes/` is an `express.Router()` doing raw parameterized SQL via `mysql2/promise` (`db.query(sql, params)`) directly against the request handler — no ORM, no service/repository layer, no request validation middleware. Every handler wraps its body in try/catch and responds `res.status(500).json({ error: err.message })` on failure; follow that shape for new routes rather than introducing a different error format.
 
