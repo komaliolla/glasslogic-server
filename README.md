@@ -21,11 +21,12 @@ Node.js + Express REST API for GlassLogic, an auto-glass shop management app. Se
    npm install
    ```
 
-2. Create the database(s) and import reference data — see [db/README_SETUP.md](db/README_SETUP.md) for full steps. In short:
+2. Create the database(s) and import reference data — schema, raw data, and import scripts live in the sibling [../database](../database) folder. See [../database/README.md](../database/README.md) for full steps. In short:
 
    ```bash
-   mysql -u root -p < db/nags_schema.sql
-   node scripts/import_nags.js   # imports the NAGS DATA/*.txt files (~2M rows, 5-15 min)
+   cd ../database && npm install
+   mysql -u root -p < schema/nags_schema.sql
+   npm run import-nags   # imports the NAGS data/*.txt files (~2M rows, 5-15 min)
    ```
 
 3. Configure environment
@@ -56,7 +57,8 @@ Node.js + Express REST API for GlassLogic, an auto-glass shop management app. Se
 | `DB_NAME` | Default database name |
 | `PORT` | Port the API listens on |
 | `CLIENT_URL` | Frontend origin, used for CORS |
-| `DATA_DIR` | Optional. Where `scripts/import_nags.js` reads `*.txt` from. Defaults to `./DATA` |
+
+`DATA_DIR` (optional, where NAGS import reads `*.txt` from) now belongs to `../database/.env` — see [../database/README.md](../database/README.md).
 
 ## API routes
 
@@ -71,11 +73,14 @@ Node.js + Express REST API for GlassLogic, an auto-glass shop management app. Se
 
 ## Databases
 
-The API connects to three MySQL databases on the same instance via separate pools in `config/`:
+The API connects to four MySQL databases on the same instance via separate pools in the sibling [../database/config/](../database/config/) folder:
 
-- `db.js` → default DB (`DB_NAME`, e.g. `glasslogic`) — customers, business types
+- `db.js` → default DB (`DB_NAME`, e.g. `glasslogic`) — customers, business types, schedule_bookings, call_list
 - `gl2015Db.js` → `gl2015m1` — discounts
 - `nagsDb.js` → `vehicle_db` — NAGS vehicle/glass/hardware data
+- `userDb.js` → `user` — employees, shop_settings, user_credentials, RBAC tables
+
+See [../database/README.md](../database/README.md) for schema/setup details.
 
 ## Related repo
 

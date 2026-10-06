@@ -1,6 +1,9 @@
 const express = require('express');
 const router  = express.Router();
-const db      = require('../config/db');
+const db      = require('../../database/config/db');
+const authenticate = require('../middleware/authenticate');
+
+router.use(authenticate);
 
 const toRecord = r => ({
   id:           r.id,
@@ -19,14 +22,14 @@ const toRecord = r => ({
 // GET /api/invoices
 router.get('/', async (req, res) => {
   try {
-    const [rows] = await db.query('SELECT * FROM invoices ORDER BY id DESC');
+    const [rows] = await db.query('SELECT * FROM invoices WHERE shop_id = ? ORDER BY id DESC', [req.user.shopId]);
     res.json(rows.map(toRecord));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// PUT /api/invoices — create or update (upsert by id)
+// PUT /api/invoices — create or update (upsert by shop_id + id — each shop numbers its own invoices from 1)
 router.put('/', async (req, res) => {
   try {
     const {
@@ -41,8 +44,8 @@ router.put('/', async (req, res) => {
 
     await db.query(
       `INSERT INTO invoices
-         (id, date, bill_to, sold_to, install_date, status, amount, paid_date, check_number, check_amount, adjustment)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         (shop_id, id, date, bill_to, sold_to, install_date, status, amount, paid_date, check_number, check_amount, adjustment)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
          date         = VALUES(date),
          bill_to      = VALUES(bill_to),
@@ -54,10 +57,10 @@ router.put('/', async (req, res) => {
          check_number = VALUES(check_number),
          check_amount = VALUES(check_amount),
          adjustment   = VALUES(adjustment)`,
-      [id, date, billTo, soldTo, installDate, status, amount, paidDate, checkNumber, checkAmount, adjustment]
+      [req.user.shopId, id, date, billTo, soldTo, installDate, status, amount, paidDate, checkNumber, checkAmount, adjustment]
     );
 
-    const [[row]] = await db.query('SELECT * FROM invoices WHERE id = ?', [id]);
+    const [[row]] = await db.query('SELECT * FROM invoices WHERE id = ? AND shop_id = ?', [id, req.user.shopId]);
     res.json(toRecord(row));
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -67,7 +70,7 @@ router.put('/', async (req, res) => {
 // DELETE /api/invoices/:id
 router.delete('/:id', async (req, res) => {
   try {
-    const [result] = await db.query('DELETE FROM invoices WHERE id = ?', [req.params.id]);
+    const [result] = await db.query('DELETE FROM invoices WHERE id = ? AND shop_id = ?', [req.params.id, req.user.shopId]);
     if (result.affectedRows === 0) return res.status(404).json({ error: 'Not found' });
     res.json({ success: true });
   } catch (err) {

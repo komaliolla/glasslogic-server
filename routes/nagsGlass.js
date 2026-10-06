@@ -1,6 +1,6 @@
 const express = require('express');
 const router  = express.Router();
-const db      = require('../config/nagsDb'); // vehicle_db
+const db      = require('../../database/config/nagsDb'); // vehicle_db
 
 // Windshield prefix codes (all others are tempered/door/specialty)
 const WINDSHIELD_PREFIXES = new Set(['FW','FQ','FV','FD','FB','FL','FP','FR','FS','FT','FY']);

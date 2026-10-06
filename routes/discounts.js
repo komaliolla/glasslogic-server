@@ -1,6 +1,9 @@
 const express = require('express');
 const router  = express.Router();
-const db      = require('../config/gl2015Db');
+const db      = require('../../database/config/gl2015Db');
+const authenticate = require('../middleware/authenticate');
+
+router.use(authenticate);
 
 // GET /api/discounts
 router.get('/', async (req, res) => {
@@ -22,8 +25,10 @@ router.get('/', async (req, res) => {
          dd.min_hours2       AS min_hours,
          dd.max_hours2       AS max_hours
        FROM \`discount\` d
-       LEFT JOIN \`discount_detail\` dd ON dd.discount_code = d.discount_code
-       ORDER BY d.discount_code ASC, dd.part_type DESC`
+       LEFT JOIN \`discount_detail\` dd ON dd.discount_code = d.discount_code AND dd.shop_id = d.shop_id
+       WHERE d.shop_id = ?
+       ORDER BY d.discount_code ASC, dd.part_type DESC`,
+      [req.user.shopId]
     );
 
     const map = new Map();
@@ -100,12 +105,12 @@ router.post('/', async (req, res) => {
 
     await conn.query(
       `INSERT INTO discount
-        (discount_code, discount_name,
+        (shop_id, discount_code, discount_name,
          kit_charge, kit_amount, ukit_amount, udam_amount, two_part_amount, udam_1_5_amount, two_kit_amount,
          material_charge, material_amount,
          labor_charge, repair_charge, init_repair_amount, addtnl_repair_amount,
          edi_flag, edi_format)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
          discount_name        = VALUES(discount_name),
          kit_charge           = VALUES(kit_charge),
@@ -123,7 +128,7 @@ router.post('/', async (req, res) => {
          addtnl_repair_amount = VALUES(addtnl_repair_amount),
          edi_flag             = VALUES(edi_flag),
          edi_format           = VALUES(edi_format)`,
-      [discount_code.toUpperCase(), discount_name,
+      [req.user.shopId, discount_code.toUpperCase(), discount_name,
        kit_charge, kit_amount, ukit_amount, udam_amount, two_part_amount, udam_1_5_amount, two_kit_amount,
        material_charge, material_amount,
        labor_charge, repair_charge, init_repair_amount, addtnl_repair_amount,
@@ -142,10 +147,10 @@ router.post('/', async (req, res) => {
       const maxHrs       = d.max_hours        || 0;
       await conn.query(
         `INSERT INTO discount_detail
-          (discount_code, nags_prefix, part_type, flat_or_hourly,
+          (shop_id, discount_code, nags_prefix, part_type, flat_or_hourly,
            discount_amount,  labor_rate,  min_hours,  max_hours,
            discount_amount2, labor_rate2, min_hours2, max_hours2)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
            part_type        = VALUES(part_type),
            flat_or_hourly   = VALUES(flat_or_hourly),
@@ -157,7 +162,7 @@ router.post('/', async (req, res) => {
            labor_rate2      = VALUES(labor_rate2),
            min_hours2       = VALUES(min_hours2),
            max_hours2       = VALUES(max_hours2)`,
-        [discount_code.toUpperCase(), nagsPrefix, d.part_type,
+        [req.user.shopId, discount_code.toUpperCase(), nagsPrefix, d.part_type,
          d.flat_or_hourly === 'Hourly' ? 'H' : 'F',
          discountAmt, laborRt, minHrs, maxHrs,
          discountAmt, laborRt, minHrs, maxHrs]
@@ -174,7 +179,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-// GET /api/discounts/parts  — NAGS prefix → part type lookup (gl2015m1.parts)
+// GET /api/discounts/parts  — NAGS prefix → part type lookup (gl2015m1.parts — shared reference table, not shop-owned)
 router.get('/parts', async (req, res) => {
   try {
     const [rows] = await db.query(
@@ -202,9 +207,9 @@ router.get('/:code/details', async (req, res) => {
          \`discount_detail\`.\`min_hours2\`         AS min_hours,
          \`discount_detail\`.\`max_hours2\`         AS max_hours
        FROM \`discount_detail\`
-       WHERE \`discount_detail\`.\`discount_code\` = ?
+       WHERE \`discount_detail\`.\`discount_code\` = ? AND \`discount_detail\`.\`shop_id\` = ?
        ORDER BY \`discount_detail\`.\`part_type\` DESC`,
-      [req.params.code]
+      [req.params.code, req.user.shopId]
     );
     res.json(rows.map(r => ({ ...r, flat_or_hourly: toLabel(r.flat_or_hourly) })));
   } catch (err) {
@@ -237,16 +242,16 @@ router.put('/:code', async (req, res) => {
          material_charge = ?, material_amount = ?,
          labor_charge = ?, repair_charge = ?, init_repair_amount = ?, addtnl_repair_amount = ?,
          edi_flag = ?, edi_format = ?
-       WHERE discount_code = ?`,
+       WHERE discount_code = ? AND shop_id = ?`,
       [discount_name,
        kit_charge, kit_amount, ukit_amount,
        udam_amount, two_part_amount, udam_1_5_amount, two_kit_amount,
        material_charge, material_amount,
        labor_charge, repair_charge, init_repair_amount, addtnl_repair_amount,
-       edi_flag, edi_format, code]
+       edi_flag, edi_format, code, req.user.shopId]
     );
 
-    await conn.query('DELETE FROM `discount_detail` WHERE discount_code = ?', [code]);
+    await conn.query('DELETE FROM `discount_detail` WHERE discount_code = ? AND shop_id = ?', [code, req.user.shopId]);
 
     for (let i = 0; i < details.length; i++) {
       const d = details[i];
@@ -257,10 +262,10 @@ router.put('/:code', async (req, res) => {
       const maxHrs      = d.max_hours       || 0;
       await conn.query(
         `INSERT INTO \`discount_detail\`
-           (discount_code, nags_prefix, part_type, flat_or_hourly,
+           (shop_id, discount_code, nags_prefix, part_type, flat_or_hourly,
             discount_amount, labor_rate, min_hours, max_hours,
             discount_amount2, labor_rate2, min_hours2, max_hours2)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
            part_type        = VALUES(part_type),
            flat_or_hourly   = VALUES(flat_or_hourly),
@@ -272,7 +277,7 @@ router.put('/:code', async (req, res) => {
            labor_rate2      = VALUES(labor_rate2),
            min_hours2       = VALUES(min_hours2),
            max_hours2       = VALUES(max_hours2)`,
-        [code, nagsPrefix, d.part_type,
+        [req.user.shopId, code, nagsPrefix, d.part_type,
          d.flat_or_hourly === 'Hourly' ? 'H' : 'F',
          discountAmt, laborRt, minHrs, maxHrs,
          discountAmt, laborRt, minHrs, maxHrs]
@@ -294,8 +299,8 @@ router.delete('/:code', async (req, res) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
-    await conn.query('DELETE FROM discount_detail WHERE discount_code = ?', [req.params.code]);
-    const [result] = await conn.query('DELETE FROM discount WHERE discount_code = ?', [req.params.code]);
+    await conn.query('DELETE FROM discount_detail WHERE discount_code = ? AND shop_id = ?', [req.params.code, req.user.shopId]);
+    const [result] = await conn.query('DELETE FROM discount WHERE discount_code = ? AND shop_id = ?', [req.params.code, req.user.shopId]);
     if (result.affectedRows === 0) {
       await conn.rollback();
       return res.status(404).json({ error: 'Not found' });

@@ -10,6 +10,14 @@ const glassPartsRouter    = require('./routes/glassParts');
 const scheduleRouter      = require('./routes/schedule');
 const invoicesRouter      = require('./routes/invoices');
 const employeesRouter     = require('./routes/employees');
+const shopSettingsRouter  = require('./routes/shopSettings');
+const authRouter          = require('./routes/auth');
+const userCredentialsRouter = require('./routes/userCredentials');
+const callListRouter      = require('./routes/callList');
+const taxRatesRouter      = require('./routes/taxRates');
+const customerAuthRouter         = require('./routes/customerAuth');
+const customerPortalAccessRouter = require('./routes/customerPortalAccess');
+const customerAppointmentsRouter = require('./routes/customerAppointments');
 
 const app  = express();
 const PORT = process.env.PORT || 4000;
@@ -27,6 +35,14 @@ app.use('/api',                glassPartsRouter);   // legacy fallback
 app.use('/api/schedule',       scheduleRouter);
 app.use('/api/invoices',       invoicesRouter);
 app.use('/api/employees',      employeesRouter);
+app.use('/api/shop-settings',  shopSettingsRouter);
+app.use('/api/auth',           authRouter);
+app.use('/api/user-credentials', userCredentialsRouter);
+app.use('/api/call-list',      callListRouter);
+app.use('/api/tax-rates',      taxRatesRouter);
+app.use('/api/customer-auth',        customerAuthRouter);
+app.use('/api/customers',            customerPortalAccessRouter); // shares /api/customers with customersRouter above
+app.use('/api/customer/appointments', customerAppointmentsRouter);
 
 // ── Health check ────────────────────────────────────────────
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
