@@ -1,7 +1,8 @@
 const express = require('express');
 const router  = express.Router();
-const db      = require('../../database/config/db');
+const db      = require('../database/config/db');
 const authenticate = require('../middleware/authenticate');
+const authorize    = require('../middleware/authorize');
 
 router.use(authenticate);
 
@@ -16,7 +17,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/business-types
-router.post('/', async (req, res) => {
+router.post('/', authorize('settings:manage'), async (req, res) => {
   try {
     const { name } = req.body;
     if (!name) return res.status(400).json({ error: 'name is required' });
@@ -34,7 +35,7 @@ router.post('/', async (req, res) => {
 });
 
 // DELETE /api/business-types/:id
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authorize('settings:manage'), async (req, res) => {
   try {
     const [result] = await db.query('DELETE FROM business_types WHERE id = ? AND shop_id = ?', [req.params.id, req.user.shopId]);
     if (result.affectedRows === 0) return res.status(404).json({ error: 'Not found' });

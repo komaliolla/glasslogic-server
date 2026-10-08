@@ -2,11 +2,12 @@ const express = require('express');
 const router  = express.Router();
 const bcrypt  = require('bcrypt');
 const jwt     = require('jsonwebtoken');
-const db      = require('../../database/config/db');
+const db      = require('../database/config/db');
 const authenticateCustomer = require('../middleware/authenticateCustomer');
+const loginRateLimit = require('../middleware/loginRateLimit');
 
 // POST /api/customer-auth/login
-router.post('/login', async (req, res) => {
+router.post('/login', loginRateLimit, async (req, res) => {
   try {
     const { loginId, password } = req.body;
     if (!loginId || !password) return res.status(400).json({ error: 'Login ID and password are required' });
@@ -42,13 +43,24 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// POST /api/customer-auth/change-password
+// POST /api/customer-auth/change-password — requires the current password so a
+// stolen/short-lived token can't be turned into a permanent takeover.
 router.post('/change-password', authenticateCustomer, async (req, res) => {
   try {
-    const { newPassword } = req.body;
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword) return res.status(400).json({ error: 'currentPassword is required' });
     if (!newPassword || newPassword.length < 8) {
       return res.status(400).json({ error: 'newPassword is required (min 8 characters)' });
     }
+
+    const [[account]] = await db.query(
+      'SELECT password_hash FROM customer_credentials WHERE customer_id = ?',
+      [req.customer.customerId]
+    );
+    if (!account) return res.status(404).json({ error: 'Account not found' });
+    const match = await bcrypt.compare(currentPassword, account.password_hash);
+    if (!match) return res.status(401).json({ error: 'Current password is incorrect' });
+
     const password_hash = await bcrypt.hash(newPassword, 10);
     await db.query(
       'UPDATE customer_credentials SET password_hash = ?, must_change_password = 0 WHERE customer_id = ?',

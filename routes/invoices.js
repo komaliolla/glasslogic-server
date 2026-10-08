@@ -1,9 +1,10 @@
 const express = require('express');
 const router  = express.Router();
-const db      = require('../../database/config/db');
+const db      = require('../database/config/db');
 const authenticate = require('../middleware/authenticate');
+const authorize    = require('../middleware/authorize');
 
-router.use(authenticate);
+router.use(authenticate, authorize('invoices:manage'));
 
 const toRecord = r => ({
   id:           r.id,

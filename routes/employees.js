@@ -1,9 +1,10 @@
 const express = require('express');
 const router  = express.Router();
-const db      = require('../../database/config/userDb');
+const db      = require('../database/config/userDb');
 const authenticate = require('../middleware/authenticate');
+const authorize    = require('../middleware/authorize');
 
-router.use(authenticate);
+router.use(authenticate, authorize('user:manage'));
 
 // GET /api/employees
 router.get('/', async (req, res) => {

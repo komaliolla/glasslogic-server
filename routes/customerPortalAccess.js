@@ -2,7 +2,7 @@ const express = require('express');
 const router  = express.Router();
 const bcrypt  = require('bcrypt');
 const crypto  = require('crypto');
-const db      = require('../../database/config/db');
+const db      = require('../database/config/db');
 const authenticate = require('../middleware/authenticate');
 const authorize    = require('../middleware/authorize');
 

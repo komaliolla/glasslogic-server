@@ -1,4 +1,4 @@
-const db = require('../../database/config/userDb');
+const db = require('../database/config/userDb');
 
 // One row per sensitive action (role changes, EDI sends) — see db/rbac_schema.sql's
 // user_audit_log. Fire-and-forget by design: a logging failure shouldn't block the

@@ -1,7 +1,8 @@
 const express = require('express');
 const router  = express.Router();
-const db      = require('../../database/config/gl2015Db');
+const db      = require('../database/config/gl2015Db');
 const authenticate = require('../middleware/authenticate');
+const authorize    = require('../middleware/authorize');
 
 router.use(authenticate);
 
@@ -81,7 +82,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/discounts
-router.post('/', async (req, res) => {
+router.post('/', authorize('settings:manage'), async (req, res) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
@@ -219,7 +220,7 @@ router.get('/:code/details', async (req, res) => {
 });
 
 // PUT /api/discounts/:code  — update header + replace detail rows
-router.put('/:code', async (req, res) => {
+router.put('/:code', authorize('settings:manage'), async (req, res) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
@@ -295,7 +296,7 @@ router.put('/:code', async (req, res) => {
 });
 
 // DELETE /api/discounts/:code
-router.delete('/:code', async (req, res) => {
+router.delete('/:code', authorize('settings:manage'), async (req, res) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();

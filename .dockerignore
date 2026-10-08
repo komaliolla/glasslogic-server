@@ -1,0 +1,13 @@
+node_modules
+.env
+.env.local
+database/node_modules
+database/.env
+database/.env.local
+database/data
+database/schema
+database/scripts
+database/README.md
+database/.git
+database/.gitignore
+.git

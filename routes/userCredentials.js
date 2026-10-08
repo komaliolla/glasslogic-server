@@ -2,7 +2,7 @@ const express   = require('express');
 const router    = express.Router();
 const bcrypt    = require('bcrypt');
 const crypto    = require('crypto');
-const db        = require('../../database/config/userDb');
+const db        = require('../database/config/userDb');
 const authenticate = require('../middleware/authenticate');
 const authorize    = require('../middleware/authorize');
 const logAudit      = require('../middleware/auditLog');
@@ -79,7 +79,10 @@ router.post('/:employeeId', async (req, res) => {
     const [[role]] = await db.query('SELECT id, name FROM roles WHERE id = ?', [roleId]);
     if (!role) return res.status(400).json({ error: 'Unknown role' });
 
-    const [[existing]] = await db.query('SELECT user_id, role_id FROM user_credentials WHERE employee_id = ?', [req.params.employeeId]);
+    const [[existing]] = await db.query(
+      'SELECT user_id, role_id FROM user_credentials WHERE employee_id = ? AND shop_id = ?',
+      [req.params.employeeId, req.user.shopId]
+    );
 
     const userId = (existing && existing.role_id === role.id)
       ? existing.user_id

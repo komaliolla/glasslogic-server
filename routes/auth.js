@@ -2,13 +2,14 @@ const express = require('express');
 const router  = express.Router();
 const bcrypt  = require('bcrypt');
 const jwt     = require('jsonwebtoken');
-const db      = require('../../database/config/userDb');
+const db      = require('../database/config/userDb');
 const authenticate = require('../middleware/authenticate');
+const loginRateLimit = require('../middleware/loginRateLimit');
 
 // POST /api/auth/login
 // Staff log in with a 6-digit numeric User ID (globally unique) + password — not a username,
 // and no Shop # field. See database/schema/shops_user_db.sql and scripts/migrate_to_multitenant.js.
-router.post('/login', async (req, res) => {
+router.post('/login', loginRateLimit, async (req, res) => {
   try {
     const { userId, password } = req.body;
     if (!userId || !password) {
@@ -65,13 +66,25 @@ router.post('/login', async (req, res) => {
 });
 
 // POST /api/auth/change-password — forced on first login for system-provisioned accounts
-// (see routes/userCredentials.js), same shape as the customer portal's equivalent.
+// (see routes/userCredentials.js), same shape as the customer portal's equivalent. Requires
+// the current password so a stolen/short-lived token can't be turned into a permanent
+// takeover by just setting a new one.
 router.post('/change-password', authenticate, async (req, res) => {
   try {
-    const { newPassword } = req.body;
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword) return res.status(400).json({ error: 'currentPassword is required' });
     if (!newPassword || newPassword.length < 8) {
       return res.status(400).json({ error: 'newPassword is required (min 8 characters)' });
     }
+
+    const [[account]] = await db.query(
+      'SELECT password_hash FROM user_credentials WHERE shop_id = ? AND user_id = ?',
+      [req.user.shopId, req.user.userId]
+    );
+    if (!account) return res.status(404).json({ error: 'Account not found' });
+    const match = await bcrypt.compare(currentPassword, account.password_hash);
+    if (!match) return res.status(401).json({ error: 'Current password is incorrect' });
+
     const password_hash = await bcrypt.hash(newPassword, 10);
     await db.query(
       'UPDATE user_credentials SET password_hash = ?, must_change_password = 0 WHERE shop_id = ? AND user_id = ?',
